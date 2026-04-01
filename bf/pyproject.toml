@@ -1,0 +1,16 @@
+[project]
+name = "apoptosis-bf"
+version = "0.1.0"
+description = "Brightfield morphology analysis package placeholder for apoptosis experiments."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling>=1.27", "pathspec<0.13"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apoptosis_bf"]
+
+[tool.uv]
+package = true
