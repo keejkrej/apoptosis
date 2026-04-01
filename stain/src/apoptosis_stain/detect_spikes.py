@@ -28,6 +28,8 @@ class SpikeDetectionResult:
     prominence: float | None
     threshold: float
     dynamic_range: float
+    last_t: int
+    last_t_min: float
 
 
 app = typer.Typer(
@@ -115,6 +117,8 @@ def detect_first_spike(
             prominence=None,
             threshold=float(threshold),
             dynamic_range=dynamic_range,
+            last_t=int(roi_df["t"].iat[-1]),
+            last_t_min=float(roi_df["t_min"].iat[-1]),
         )
 
     baseline_idx = int(running_min_idx[spike_idx])
@@ -130,6 +134,8 @@ def detect_first_spike(
         prominence=float(prominence[spike_idx]),
         threshold=float(threshold),
         dynamic_range=dynamic_range,
+        last_t=int(roi_df["t"].iat[-1]),
+        last_t_min=float(roi_df["t_min"].iat[-1]),
     )
 
 
@@ -176,19 +182,41 @@ def write_histogram(
     bins: int,
     color: str,
     alpha: float,
+    accumulate_undetected_at_end: bool,
     title: str | None,
 ) -> None:
-    detected = spikes_df.loc[spikes_df["detected"], "spike_t_min"].dropna()
-    if detected.empty:
+    detected = spikes_df.loc[spikes_df["detected"], "spike_t_min"].dropna().astype(float)
+    undetected = spikes_df.loc[~spikes_df["detected"].astype(bool)].copy()
+    if detected.empty and (not accumulate_undetected_at_end or undetected.empty):
         raise ValueError("No detected spikes available to plot")
 
+    histogram_values = detected.to_numpy()
+    if accumulate_undetected_at_end and not undetected.empty:
+        end_times = undetected["last_t_min"].dropna().astype(float).to_numpy()
+        histogram_values = np.concatenate([histogram_values, end_times])
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(detected, bins=bins, color=color, alpha=alpha, edgecolor="none")
+    ax.hist(histogram_values, bins=bins, color=color, alpha=alpha, edgecolor="none")
     ax.set_xlabel("first spike time (min)")
     ax.set_ylabel("ROI count")
     ax.grid(alpha=0.2, linewidth=0.5)
     if title is not None:
         ax.set_title(title)
+    n_detected = int(spikes_df["detected"].astype(bool).sum())
+    n_total = int(len(spikes_df))
+    n_undetected = n_total - n_detected
+    annotation = f"Detected: {n_detected}/{n_total}"
+    if accumulate_undetected_at_end:
+        annotation += f"\nNo spike by end: {n_undetected}"
+    ax.text(
+        0.98,
+        0.98,
+        annotation,
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "alpha": 0.85, "edgecolor": "none"},
+    )
 
     output_plot.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_plot, dpi=150, bbox_inches="tight")
@@ -256,6 +284,11 @@ def cli(
         max=1.0,
         help="Histogram bar opacity.",
     ),
+    accumulate_undetected_at_end: bool = typer.Option(
+        True,
+        "--accumulate-undetected-at-end/--no-accumulate-undetected-at-end",
+        help="Add undetected ROIs to the histogram at the last recorded timepoint.",
+    ),
     title: str | None = typer.Option(
         "First stain-signal spike timings",
         "--title",
@@ -281,6 +314,7 @@ def cli(
         bins=bins,
         color=color,
         alpha=alpha,
+        accumulate_undetected_at_end=accumulate_undetected_at_end,
         title=title,
     )
 
