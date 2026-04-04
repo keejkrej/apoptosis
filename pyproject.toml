@@ -6,9 +6,16 @@ dev = [
 [tool.uv.workspace]
 members = ["stain", "bf"]
 
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
 [tool.uv.sources]
 apoptosis-stain = { workspace = true }
 apoptosis-bf = { workspace = true }
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
 
 [tool.uv]
 default-groups = ["dev"]

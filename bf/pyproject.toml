@@ -4,8 +4,15 @@ version = "0.1.0"
 description = "Brightfield morphology analysis package placeholder for apoptosis experiments."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "numpy>=1.26",
   "tifffile>=2025.3.30",
+  "torch>=2.6",
+  "torchvision>=0.21",
 ]
+
+[project.scripts]
+apoptosis-bf-train-resnet = "apoptosis_bf.resnet_pipeline:train_main"
+apoptosis-bf-infer-resnet = "apoptosis_bf.resnet_pipeline:infer_main"
 
 [build-system]
 requires = ["hatchling>=1.27", "pathspec<0.13"]

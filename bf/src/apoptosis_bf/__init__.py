@@ -1,1 +1,1 @@
-"""Brightfield analysis package placeholder."""
+"""Brightfield analysis package."""
