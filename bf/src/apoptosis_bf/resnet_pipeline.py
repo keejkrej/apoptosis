@@ -101,6 +101,24 @@ class PredictionResult:
     threshold: float
 
 
+@dataclass(frozen=True)
+class TimelapsePredictionRow:
+    time_index: int
+    dead_probability: float
+    hard_label: str
+
+
+@dataclass(frozen=True)
+class TimelapsePredictionResult:
+    input_path: Path
+    checkpoint_path: Path
+    output_csv_path: Path
+    channel: int
+    frame_count: int
+    threshold: float
+    rows: list[TimelapsePredictionRow]
+
+
 class ApoptosisFrameDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
     def __init__(self, records: list[ExampleRecord], image_size: int) -> None:
         if not records:
@@ -148,6 +166,14 @@ def windows_relpath_to_path(relative_path: str) -> Path:
 def parse_optional_int(value: str) -> int | None:
     stripped = value.strip()
     return int(stripped) if stripped else None
+
+
+def default_scores_csv_path(image_path: Path, channel: int) -> Path:
+    return image_path.with_name(f"{image_path.stem}_ch{channel}_scores.csv")
+
+
+def default_scores_plot_path(scores_csv_path: Path) -> Path:
+    return scores_csv_path.with_suffix(".png")
 
 
 def load_manifest(dataset_root: Path) -> list[ExampleRecord]:
@@ -223,11 +249,11 @@ def split_records_by_roi(records: list[ExampleRecord], seed: int) -> dict[str, l
     return split_records
 
 
-def preprocess_tiff_image(image_path: Path, image_size: int) -> torch.Tensor:
-    image_array = np.asarray(tifffile.imread(image_path))
+def preprocess_image_array(image_array: np.ndarray, image_size: int) -> torch.Tensor:
+    image_array = np.asarray(image_array)
     image_array = np.squeeze(image_array)
     if image_array.ndim != 2:
-        raise ValueError(f"Expected a 2D TIFF image at {image_path}, got shape {image_array.shape}")
+        raise ValueError(f"Expected a 2D image, got shape {image_array.shape}")
 
     image_tensor = torch.from_numpy(image_array.astype(np.float32, copy=False))
     min_value = float(image_tensor.min())
@@ -249,11 +275,119 @@ def preprocess_tiff_image(image_path: Path, image_size: int) -> torch.Tensor:
     return image_tensor.to(dtype=torch.float32)
 
 
+def preprocess_tiff_image(image_path: Path, image_size: int) -> torch.Tensor:
+    return preprocess_image_array(np.asarray(tifffile.imread(image_path)), image_size=image_size)
+
+
 def build_model(pretrained: bool) -> nn.Module:
     weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
     model = resnet18(weights=weights)
     model.fc = nn.Linear(model.fc.in_features, 1)
     return model
+
+
+def load_roi_shape_from_index(tif_path: Path) -> tuple[int, int, int, int, int] | None:
+    index_path = tif_path.parent / "index.json"
+    if not index_path.exists():
+        return None
+
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    for roi_entry in payload.get("rois", []):
+        if str(roi_entry.get("fileName")) == tif_path.name:
+            shape = tuple(int(size) for size in roi_entry["shape"])
+            if len(shape) != 5:
+                raise ValueError(f"ROI shape from {index_path} must have 5 dimensions, got {shape}")
+            return shape
+    return None
+
+
+def select_frames_from_interleaved_pages(
+    raw_stack: np.ndarray,
+    *,
+    channel: int,
+    channel_count: int,
+) -> np.ndarray:
+    if raw_stack.ndim != 3:
+        raise ValueError(f"Expected flattened pages with shape (N, Y, X), got {raw_stack.shape}")
+    if channel_count <= 0:
+        raise ValueError(f"channel_count must be positive, got {channel_count}")
+    if not 0 <= channel < channel_count:
+        raise ValueError(f"channel must be between 0 and {channel_count - 1}, got {channel}")
+    if raw_stack.shape[0] % channel_count != 0:
+        raise ValueError(
+            f"Page count {raw_stack.shape[0]} is not divisible by channel_count={channel_count}"
+        )
+    time_count = raw_stack.shape[0] // channel_count
+    reshaped = raw_stack.reshape(time_count, channel_count, raw_stack.shape[1], raw_stack.shape[2])
+    return np.asarray(reshaped[:, channel, :, :])
+
+
+def extract_timelapse_frames(
+    tif_path: Path,
+    *,
+    channel: int,
+    channel_count: int | None = None,
+) -> np.ndarray:
+    resolved_path = tif_path.resolve()
+    with tifffile.TiffFile(resolved_path) as tif:
+        series = tif.series[0]
+        axes = series.axes
+        raw_stack = np.asarray(series.asarray())
+
+    roi_shape = load_roi_shape_from_index(resolved_path)
+    if roi_shape is not None:
+        time_count, indexed_channel_count, z_count, height, width = roi_shape
+        if not 0 <= channel < indexed_channel_count:
+            raise ValueError(
+                f"channel must be between 0 and {indexed_channel_count - 1}, got {channel}"
+            )
+        flattened_pages = time_count * indexed_channel_count * z_count
+        if raw_stack.shape == roi_shape:
+            reshaped = raw_stack
+        elif raw_stack.ndim == 3 and raw_stack.shape == (flattened_pages, height, width):
+            reshaped = raw_stack.reshape(roi_shape)
+        elif raw_stack.ndim == 4 and raw_stack.shape == (time_count, indexed_channel_count, height, width):
+            reshaped = raw_stack.reshape(time_count, indexed_channel_count, z_count, height, width)
+        else:
+            raise ValueError(
+                f"{resolved_path} must reshape to {roi_shape}, got raw TIFF shape {raw_stack.shape}"
+            )
+        return np.asarray(reshaped[:, channel, 0, :, :])
+
+    if raw_stack.ndim == 2:
+        if channel != 0:
+            raise ValueError(f"{resolved_path} is a single-channel frame; channel must be 0")
+        return raw_stack[np.newaxis, :, :]
+
+    if axes == "TYX":
+        if channel != 0:
+            raise ValueError(f"{resolved_path} has no explicit channel axis; channel must be 0")
+        return np.asarray(raw_stack)
+
+    if axes == "CYX":
+        if not 0 <= channel < raw_stack.shape[0]:
+            raise ValueError(f"channel must be between 0 and {raw_stack.shape[0] - 1}, got {channel}")
+        return np.asarray(raw_stack[channel : channel + 1, :, :])
+
+    if axes == "TCYX":
+        if not 0 <= channel < raw_stack.shape[1]:
+            raise ValueError(f"channel must be between 0 and {raw_stack.shape[1] - 1}, got {channel}")
+        return np.asarray(raw_stack[:, channel, :, :])
+
+    if axes == "TCZYX":
+        if not 0 <= channel < raw_stack.shape[1]:
+            raise ValueError(f"channel must be between 0 and {raw_stack.shape[1] - 1}, got {channel}")
+        return np.asarray(raw_stack[:, channel, 0, :, :])
+
+    if axes == "IYX":
+        inferred_channel_count = channel_count if channel_count is not None else 1
+        return select_frames_from_interleaved_pages(
+            np.asarray(raw_stack),
+            channel=channel,
+            channel_count=inferred_channel_count,
+        )
+
+    raise ValueError(f"Unsupported TIFF axes {axes!r} for {resolved_path}")
 
 
 def build_dataloader(
@@ -639,6 +773,83 @@ def load_checkpoint(checkpoint_path: Path, device: torch.device) -> tuple[nn.Mod
 
 
 @torch.inference_mode()
+def predict_timelapse(
+    checkpoint_path: Path,
+    tif_path: Path,
+    *,
+    channel: int = 0,
+    channel_count: int | None = None,
+    output_csv_path: Path | None = None,
+    device: str = "auto",
+    threshold: float | None = None,
+    batch_size: int = 64,
+) -> TimelapsePredictionResult:
+    resolved_tif_path = tif_path.resolve()
+    resolved_checkpoint_path = checkpoint_path.resolve()
+    resolved_output_csv_path = (
+        output_csv_path.resolve()
+        if output_csv_path is not None
+        else default_scores_csv_path(resolved_tif_path, channel)
+    )
+    resolved_device = choose_device(device)
+    model, config = load_checkpoint(resolved_checkpoint_path, device=resolved_device)
+    image_size = int(config["image_size"])
+    decision_threshold = float(threshold if threshold is not None else config.get("threshold", DEFAULT_THRESHOLD))
+    frames = extract_timelapse_frames(
+        resolved_tif_path,
+        channel=channel,
+        channel_count=channel_count,
+    )
+
+    rows: list[TimelapsePredictionRow] = []
+    for batch_start in range(0, frames.shape[0], batch_size):
+        batch_frames = frames[batch_start : batch_start + batch_size]
+        batch_tensor = torch.stack(
+            [preprocess_image_array(frame, image_size=image_size) for frame in batch_frames],
+            dim=0,
+        ).to(resolved_device)
+        batch_probabilities = torch.sigmoid(model(batch_tensor).squeeze(1)).cpu().tolist()
+        for frame_offset, probability in enumerate(batch_probabilities):
+            time_index = batch_start + frame_offset
+            hard_label = "dead" if float(probability) >= decision_threshold else "live"
+            rows.append(
+                TimelapsePredictionRow(
+                    time_index=time_index,
+                    dead_probability=float(probability),
+                    hard_label=hard_label,
+                )
+            )
+
+    resolved_output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with resolved_output_csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["time_index", "dead_probability", "predicted_label", "input_tif", "channel"],
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    "time_index": row.time_index,
+                    "dead_probability": f"{row.dead_probability:.6f}",
+                    "predicted_label": row.hard_label,
+                    "input_tif": str(resolved_tif_path),
+                    "channel": channel,
+                }
+            )
+
+    return TimelapsePredictionResult(
+        input_path=resolved_tif_path,
+        checkpoint_path=resolved_checkpoint_path,
+        output_csv_path=resolved_output_csv_path,
+        channel=channel,
+        frame_count=len(rows),
+        threshold=decision_threshold,
+        rows=rows,
+    )
+
+
+@torch.inference_mode()
 def predict_single_image(
     checkpoint_path: Path,
     image_path: Path,
@@ -646,22 +857,26 @@ def predict_single_image(
     device: str = "auto",
     threshold: float | None = None,
 ) -> PredictionResult:
-    resolved_image_path = image_path.resolve()
-    resolved_checkpoint_path = checkpoint_path.resolve()
-    resolved_device = choose_device(device)
-    model, config = load_checkpoint(resolved_checkpoint_path, device=resolved_device)
-    image_size = int(config["image_size"])
-    decision_threshold = float(threshold if threshold is not None else config.get("threshold", DEFAULT_THRESHOLD))
-
-    image_tensor = preprocess_tiff_image(resolved_image_path, image_size=image_size).unsqueeze(0).to(resolved_device)
-    probability = float(torch.sigmoid(model(image_tensor).squeeze()).cpu())
-    hard_label = "dead" if probability >= decision_threshold else "live"
+    timelapse_prediction = predict_timelapse(
+        checkpoint_path=checkpoint_path,
+        tif_path=image_path,
+        channel=0,
+        channel_count=1,
+        device=device,
+        threshold=threshold,
+    )
+    if timelapse_prediction.frame_count != 1:
+        raise ValueError(
+            f"{image_path} produced {timelapse_prediction.frame_count} frames; "
+            "use predict_timelapse for multi-frame TIFFs."
+        )
+    row = timelapse_prediction.rows[0]
     return PredictionResult(
-        image_path=resolved_image_path,
-        dead_probability=probability,
-        hard_label=hard_label,
-        checkpoint_path=resolved_checkpoint_path,
-        threshold=decision_threshold,
+        image_path=timelapse_prediction.input_path,
+        dead_probability=row.dead_probability,
+        hard_label=row.hard_label,
+        checkpoint_path=timelapse_prediction.checkpoint_path,
+        threshold=timelapse_prediction.threshold,
     )
 
 
@@ -695,13 +910,73 @@ def build_train_parser() -> argparse.ArgumentParser:
 
 def build_infer_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run single-image inference with a trained bright-field ResNet checkpoint."
+        description=(
+            "Run timelapse inference with a trained bright-field ResNet checkpoint. "
+            "Single-frame TIFFs are treated as a one-frame timelapse."
+        )
     )
     parser.add_argument("checkpoint", type=Path)
-    parser.add_argument("image", type=Path)
+    parser.add_argument("tif", type=Path)
+    parser.add_argument("--channel", type=int, default=0)
+    parser.add_argument("--channel-count", type=int, default=None)
+    parser.add_argument("--output-csv", type=Path, default=None)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--threshold", type=float, default=None)
+    parser.add_argument("--batch-size", type=int, default=64)
     return parser
+
+
+def build_plot_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Plot a per-frame dead-probability score series from inference CSV output."
+    )
+    parser.add_argument("scores_csv", type=Path)
+    parser.add_argument("--output-png", type=Path, default=None)
+    parser.add_argument("--title", default=None)
+    return parser
+
+
+def plot_score_series(
+    scores_csv_path: Path,
+    *,
+    output_png_path: Path | None = None,
+    title: str | None = None,
+) -> Path:
+    resolved_scores_csv = scores_csv_path.resolve()
+    resolved_output_png = (
+        output_png_path.resolve()
+        if output_png_path is not None
+        else default_scores_plot_path(resolved_scores_csv)
+    )
+
+    time_indices: list[int] = []
+    dead_probabilities: list[float] = []
+    with resolved_scores_csv.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            time_indices.append(int(row["time_index"]))
+            dead_probabilities.append(float(row["dead_probability"]))
+    if not time_indices:
+        raise ValueError(f"No rows found in {resolved_scores_csv}")
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    figure, axis = plt.subplots(figsize=(10, 4))
+    axis.plot(time_indices, dead_probabilities, color="#c42121", linewidth=2)
+    axis.axhline(DEFAULT_THRESHOLD, color="#555555", linestyle="--", linewidth=1)
+    axis.set_xlabel("Time Index")
+    axis.set_ylabel("Dead Probability")
+    axis.set_ylim(-0.02, 1.02)
+    axis.set_title(title or resolved_scores_csv.stem)
+    axis.grid(True, alpha=0.25)
+    figure.tight_layout()
+    resolved_output_png.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(resolved_output_png, dpi=160)
+    plt.close(figure)
+    return resolved_output_png
 
 
 def train_main(argv: list[str] | None = None) -> None:
@@ -731,14 +1006,33 @@ def train_main(argv: list[str] | None = None) -> None:
 
 def infer_main(argv: list[str] | None = None) -> None:
     args = build_infer_parser().parse_args(argv)
-    prediction = predict_single_image(
+    prediction = predict_timelapse(
         checkpoint_path=args.checkpoint,
-        image_path=args.image,
+        tif_path=args.tif,
+        channel=args.channel,
+        channel_count=args.channel_count,
+        output_csv_path=args.output_csv,
         device=args.device,
         threshold=args.threshold,
+        batch_size=args.batch_size,
     )
-    print(f"Image: {prediction.image_path}")
+    probabilities = [row.dead_probability for row in prediction.rows]
+    print(f"Input TIFF: {prediction.input_path}")
     print(f"Checkpoint: {prediction.checkpoint_path}")
-    print(f"Dead probability: {prediction.dead_probability:.6f}")
+    print(f"Output CSV: {prediction.output_csv_path}")
+    print(f"Channel: {prediction.channel}")
+    print(f"Frames scored: {prediction.frame_count}")
     print(f"Threshold: {prediction.threshold:.3f}")
-    print(f"Predicted label: {prediction.hard_label}")
+    print(f"Min dead probability: {min(probabilities):.6f}")
+    print(f"Max dead probability: {max(probabilities):.6f}")
+    print(f"Mean dead probability: {sum(probabilities) / len(probabilities):.6f}")
+
+
+def plot_main(argv: list[str] | None = None) -> None:
+    args = build_plot_parser().parse_args(argv)
+    output_path = plot_score_series(
+        args.scores_csv,
+        output_png_path=args.output_png,
+        title=args.title,
+    )
+    print(f"Wrote plot: {output_path}")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +10,11 @@ import torch
 
 from apoptosis_bf.resnet_pipeline import (
     TrainingConfig,
+    extract_timelapse_frames,
     load_manifest,
+    plot_score_series,
     predict_single_image,
+    predict_timelapse,
     preprocess_tiff_image,
     split_records_by_roi,
     train_model,
@@ -77,6 +81,28 @@ def write_synthetic_dataset(dataset_root: Path, roi_count: int = 10) -> list[Pat
     return sample_images
 
 
+def write_raw_roi_timelapse(roi_root: Path) -> Path:
+    roi_root.mkdir(parents=True, exist_ok=True)
+    index_payload = {
+        "rois": [
+            {
+                "roi": 0,
+                "fileName": "Roi0.tif",
+                "shape": [3, 2, 1, 16, 16],
+            }
+        ]
+    }
+    (roi_root / "index.json").write_text(json.dumps(index_payload), encoding="utf-8")
+
+    pages: list[np.ndarray] = []
+    for time_index in range(3):
+        pages.append(build_image(dead_probability=time_index / 2.0))
+        pages.append(build_image(dead_probability=0.9 - time_index * 0.2))
+    tif_path = roi_root / "Roi0.tif"
+    tifffile.imwrite(tif_path, np.stack(pages, axis=0))
+    return tif_path
+
+
 def test_split_records_by_roi_keeps_groups_isolated(tmp_path: Path) -> None:
     dataset_root = tmp_path / "dataset"
     write_synthetic_dataset(dataset_root, roi_count=10)
@@ -102,6 +128,17 @@ def test_preprocess_tiff_image_outputs_resnet_tensor(tmp_path: Path) -> None:
     assert tensor.shape == (3, 64, 64)
     assert tensor.dtype == torch.float32
     assert bool(tensor.isfinite().all())
+
+
+def test_extract_timelapse_frames_uses_sibling_index_for_channel_selection(tmp_path: Path) -> None:
+    tif_path = write_raw_roi_timelapse(tmp_path / "roi" / "Pos0")
+
+    frames = extract_timelapse_frames(tif_path, channel=0)
+
+    assert frames.shape == (3, 16, 16)
+    assert frames[0].tolist() == build_image(0.0).tolist()
+    assert frames[1].tolist() == build_image(0.5).tolist()
+    assert frames[2].tolist() == build_image(1.0).tolist()
 
 
 def test_train_model_and_single_image_inference_smoke(tmp_path: Path) -> None:
@@ -142,3 +179,21 @@ def test_train_model_and_single_image_inference_smoke(tmp_path: Path) -> None:
     )
     assert 0.0 <= prediction.dead_probability <= 1.0
     assert prediction.hard_label in {"live", "dead"}
+
+    timelapse_tif = write_raw_roi_timelapse(tmp_path / "raw_roi" / "Pos0")
+    timelapse_prediction = predict_timelapse(
+        checkpoint_path=artifacts.best_checkpoint_path,
+        tif_path=timelapse_tif,
+        channel=0,
+        device="cpu",
+        output_csv_path=tmp_path / "scores.csv",
+        batch_size=2,
+    )
+    assert timelapse_prediction.frame_count == 3
+    assert timelapse_prediction.output_csv_path.exists()
+    assert [row.time_index for row in timelapse_prediction.rows] == [0, 1, 2]
+    assert all(0.0 <= row.dead_probability <= 1.0 for row in timelapse_prediction.rows)
+
+    plot_path = plot_score_series(timelapse_prediction.output_csv_path, output_png_path=tmp_path / "scores.png")
+    assert plot_path.exists()
+    assert plot_path.stat().st_size > 0

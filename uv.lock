@@ -34,6 +34,7 @@ name = "apoptosis-bf"
 version = "0.1.0"
 source = { editable = "bf" }
 dependencies = [
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "tifffile" },
     { name = "torch" },
@@ -42,6 +43,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "matplotlib", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "tifffile", specifier = ">=2025.3.30" },
     { name = "torch", specifier = ">=2.6", index = "https://download.pytorch.org/whl/cu130" },
