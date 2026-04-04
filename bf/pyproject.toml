@@ -3,7 +3,9 @@ name = "apoptosis-bf"
 version = "0.1.0"
 description = "Brightfield morphology analysis package placeholder for apoptosis experiments."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+  "tifffile>=2025.3.30",
+]
 
 [build-system]
 requires = ["hatchling>=1.27", "pathspec<0.13"]
