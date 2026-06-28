@@ -7,3 +7,6 @@ dist/
 build/
 .ruff_cache/
 .ty_cache/
+datasets/
+runs/
+lightning_logs/

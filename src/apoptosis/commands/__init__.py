@@ -1,1 +1,9 @@
-from apoptosis.commands import hello, label, version  # noqa: F401
+from apoptosis.commands import (  # noqa: F401
+    dataset,
+    eval,
+    hello,
+    label,
+    predict,
+    train,
+    version,
+)

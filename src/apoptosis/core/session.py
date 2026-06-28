@@ -7,6 +7,8 @@ from apoptosis.services.labeling import LabelingSession
 _session: LabelingSession | None = None
 
 DEFAULT_DATA_DIR = Path("/home/jack/data/lisca_review/fig6/20260327")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_LABELS_PATH = PROJECT_ROOT / "labels.json"
 
 
 def get_session_optional() -> LabelingSession | None:
@@ -25,6 +27,6 @@ def configure_session(
     labels_path: Path | None = None,
 ) -> LabelingSession:
     global _session
-    resolved_labels = labels_path or (data_dir / "labels.json")
+    resolved_labels = labels_path or DEFAULT_LABELS_PATH
     _session = LabelingSession(data_dir=data_dir, labels_path=resolved_labels)
     return _session

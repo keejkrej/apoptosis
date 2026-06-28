@@ -49,7 +49,6 @@ def list_rois() -> list[dict[str, object]]:
             "roi_id": roi.roi_id,
             "key": roi.key,
             "timepoints": roi.timepoints,
-            "healthy_sentinel": roi.healthy_sentinel,
             "labeled": roi.labeled,
             "death_frame": roi.death_frame,
             "is_healthy": roi.is_healthy,
@@ -94,12 +93,13 @@ def save_label(body: LabelRequest) -> dict[str, object]:
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     detail = session.roi_detail(roi)
-    sentinel = int(detail["healthy_sentinel"])
+    label_info = detail["label"]
+    assert isinstance(label_info, dict)
     return {
         "position": label.position,
         "roi_id": label.roi_id,
         "death_frame": label.death_frame,
-        "is_healthy": label.death_frame >= sentinel,
+        "is_healthy": label_info["is_healthy"],
         "labeled_at": label.labeled_at,
     }
 

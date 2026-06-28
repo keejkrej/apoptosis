@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from apoptosis.core.roi import RoiRef, healthy_sentinel_time
+from apoptosis.core.roi import RoiRef, healthy_label_value, timepoint_count
 
 
 @dataclass
@@ -51,9 +51,13 @@ class LabelStore:
         roi: RoiRef,
         death_frame: int,
     ) -> CellLabel:
-        sentinel = healthy_sentinel_time(data_dir, roi)
-        if death_frame < 0 or death_frame > sentinel:
-            msg = f"death_frame must be between 0 and {sentinel}"
+        timepoints = timepoint_count(data_dir, roi)
+        healthy_value = healthy_label_value(data_dir, roi)
+        if death_frame < 0 or death_frame > healthy_value:
+            msg = (
+                f"death_frame must be 0..{timepoints - 1} for death, "
+                f"or {healthy_value} for healthy"
+            )
             raise ValueError(msg)
         label = CellLabel(
             position=roi.position,

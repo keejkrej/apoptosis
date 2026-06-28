@@ -99,5 +99,10 @@ def frame_to_png(
     return buffer.getvalue()
 
 
-def healthy_sentinel_time(data_dir: Path, roi: RoiRef) -> int:
+def healthy_label_value(data_dir: Path, roi: RoiRef) -> int:
+    """Stored death_frame value meaning the cell stayed healthy."""
     return timepoint_count(data_dir, roi)
+
+
+def is_healthy_label(death_frame: int, timepoints: int) -> bool:
+    return death_frame >= timepoints

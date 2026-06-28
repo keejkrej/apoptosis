@@ -1,0 +1,302 @@
+[
+  {
+    "position": "Pos0",
+    "roi_id": 0,
+    "death_frame": 106,
+    "labeled_at": "2026-06-28T20:10:53.364121+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 1,
+    "death_frame": 32,
+    "labeled_at": "2026-06-28T20:08:38.675767+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 10,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:19:21.180686+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 11,
+    "death_frame": 163,
+    "labeled_at": "2026-06-28T20:19:37.976996+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 12,
+    "death_frame": 157,
+    "labeled_at": "2026-06-28T20:20:02.538080+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 13,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:20:08.456599+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 14,
+    "death_frame": 195,
+    "labeled_at": "2026-06-28T20:20:34.603430+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 15,
+    "death_frame": 157,
+    "labeled_at": "2026-06-28T20:20:51.259690+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 16,
+    "death_frame": 89,
+    "labeled_at": "2026-06-28T20:21:08.258446+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 17,
+    "death_frame": 156,
+    "labeled_at": "2026-06-28T20:21:27.764920+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 18,
+    "death_frame": 92,
+    "labeled_at": "2026-06-28T20:21:46.188928+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 19,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:21:53.936488+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 2,
+    "death_frame": 123,
+    "labeled_at": "2026-06-28T20:09:07.861541+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 20,
+    "death_frame": 126,
+    "labeled_at": "2026-06-28T20:22:06.038327+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 21,
+    "death_frame": 219,
+    "labeled_at": "2026-06-28T20:22:19.695083+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 22,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:22:27.241446+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 23,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:22:33.427821+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 24,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:23:04.574091+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 25,
+    "death_frame": 101,
+    "labeled_at": "2026-06-28T20:23:42.483207+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 26,
+    "death_frame": 189,
+    "labeled_at": "2026-06-28T20:25:07.706821+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 27,
+    "death_frame": 189,
+    "labeled_at": "2026-06-28T20:25:34.336401+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 28,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:25:49.235933+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 29,
+    "death_frame": 110,
+    "labeled_at": "2026-06-28T20:26:23.303195+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 3,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:09:31.251170+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 30,
+    "death_frame": 232,
+    "labeled_at": "2026-06-28T20:26:34.141068+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 31,
+    "death_frame": 178,
+    "labeled_at": "2026-06-28T20:26:58.082277+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 4,
+    "death_frame": 166,
+    "labeled_at": "2026-06-28T20:10:02.385410+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 5,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:12:23.070818+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 6,
+    "death_frame": 214,
+    "labeled_at": "2026-06-28T20:23:29.060187+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 7,
+    "death_frame": 144,
+    "labeled_at": "2026-06-28T20:13:32.676631+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 8,
+    "death_frame": 145,
+    "labeled_at": "2026-06-28T20:14:09.275904+00:00"
+  },
+  {
+    "position": "Pos0",
+    "roi_id": 9,
+    "death_frame": 142,
+    "labeled_at": "2026-06-28T20:19:10.929939+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 0,
+    "death_frame": 175,
+    "labeled_at": "2026-06-28T20:29:35.318271+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 1,
+    "death_frame": 225,
+    "labeled_at": "2026-06-28T20:29:45.979842+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 2,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:30:05.497081+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 28,
+    "death_frame": 26,
+    "labeled_at": "2026-06-28T20:32:06.065640+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 29,
+    "death_frame": 98,
+    "labeled_at": "2026-06-28T20:32:25.238753+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 3,
+    "death_frame": 34,
+    "labeled_at": "2026-06-28T20:30:42.505228+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 4,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:30:50.081731+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 5,
+    "death_frame": 57,
+    "labeled_at": "2026-06-28T20:31:12.618988+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 6,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:31:19.837010+00:00"
+  },
+  {
+    "position": "Pos28",
+    "roi_id": 7,
+    "death_frame": 158,
+    "labeled_at": "2026-06-28T20:31:51.356347+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 87,
+    "death_frame": 99,
+    "labeled_at": "2026-06-28T20:28:37.966292+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 88,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:50.614226+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 89,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:34.552077+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 90,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:32.324679+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 91,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:28.721603+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 92,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:21.036672+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 93,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:16.523420+00:00"
+  },
+  {
+    "position": "Pos70",
+    "roi_id": 94,
+    "death_frame": 241,
+    "labeled_at": "2026-06-28T20:27:12.234509+00:00"
+  }
+]

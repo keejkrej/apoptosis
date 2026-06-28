@@ -10,6 +10,7 @@ from apoptosis.core.roi import (
     RoiRef,
     discover_rois,
     frame_to_png,
+    is_healthy_label,
     timepoint_count,
 )
 
@@ -20,7 +21,6 @@ class RoiSummary:
     roi_id: int
     key: str
     timepoints: int
-    healthy_sentinel: int
     labeled: bool
     death_frame: int | None
     is_healthy: bool | None
@@ -65,12 +65,11 @@ class LabelingSession:
                     roi_id=roi.roi_id,
                     key=roi.key,
                     timepoints=timepoints,
-                    healthy_sentinel=timepoints,
                     labeled=label is not None,
                     death_frame=None if label is None else label.death_frame,
                     is_healthy=None
                     if label is None
-                    else label.death_frame >= timepoints,
+                    else is_healthy_label(label.death_frame, timepoints),
                 )
             )
         return summaries
@@ -96,13 +95,11 @@ class LabelingSession:
     def roi_detail(self, roi: RoiRef) -> dict[str, object]:
         label = self.store.get(roi)
         timepoints = self.timepoints_for(roi)
-        sentinel = timepoints
         return {
             "position": roi.position,
             "roi_id": roi.roi_id,
             "key": roi.key,
             "timepoints": timepoints,
-            "healthy_sentinel": sentinel,
             "channels": {
                 "brightfield": CHANNEL_BRIGHTFIELD,
                 "toto": CHANNEL_TOTO,
@@ -111,7 +108,7 @@ class LabelingSession:
             if label is None
             else {
                 "death_frame": label.death_frame,
-                "is_healthy": label.death_frame >= sentinel,
+                "is_healthy": is_healthy_label(label.death_frame, timepoints),
                 "labeled_at": label.labeled_at,
             },
         }
