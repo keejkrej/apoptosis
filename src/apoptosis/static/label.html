@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apoptosis Labeler</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1115;
+        --panel: #171a21;
+        --border: #2a3140;
+        --text: #e8ecf3;
+        --muted: #9aa7bd;
+        --accent: #5b9dff;
+        --danger: #ff6b6b;
+        --ok: #5bd69d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 16px;
+        padding: 16px 20px 24px;
+      }
+      .viewer,
+      .sidebar {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .image-wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .image-panel h3 {
+        margin: 0 0 8px;
+        font-size: 0.9rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      img {
+        width: 100%;
+        max-width: 420px;
+        aspect-ratio: 1;
+        object-fit: contain;
+        background: #000;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        image-rendering: pixelated;
+      }
+      .controls {
+        margin-top: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .meta strong {
+        color: var(--text);
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      button {
+        border: 1px solid var(--border);
+        background: #222733;
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 0.92rem;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button.primary {
+        background: #24406f;
+        border-color: #3d6db3;
+      }
+      button.danger {
+        background: #4a2323;
+        border-color: #8f3f3f;
+      }
+      button.ok {
+        background: #1f4a37;
+        border-color: #3f8f6d;
+      }
+      .status {
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #12151c;
+        border: 1px solid var(--border);
+        min-height: 44px;
+      }
+      .status.labeled-healthy {
+        border-color: #2f6d52;
+        color: var(--ok);
+      }
+      .status.labeled-death {
+        border-color: #7a3d3d;
+        color: #ffb4b4;
+      }
+      .roi-list {
+        margin-top: 12px;
+        max-height: 70vh;
+        overflow: auto;
+        display: grid;
+        gap: 6px;
+      }
+      .roi-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: #12151c;
+        cursor: pointer;
+        font-size: 0.88rem;
+      }
+      .roi-item.active {
+        border-color: var(--accent);
+      }
+      .roi-item.done {
+        color: var(--ok);
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+      @media (max-width: 1100px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        .image-wrap {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>Apoptosis Labeler</strong>
+        <span id="sessionSummary" class="hint"></span>
+      </div>
+      <div id="progressText" class="hint"></div>
+    </header>
+    <main>
+      <section class="viewer">
+        <div class="meta" id="roiMeta"></div>
+        <div class="image-wrap">
+          <div class="image-panel">
+            <h3>Brightfield (channel 0)</h3>
+            <img id="bfImage" alt="Brightfield frame" />
+          </div>
+          <div class="image-panel">
+            <h3>Toto-3-iodide (channel 1, reference)</h3>
+            <img id="totoImage" alt="Toto frame" />
+          </div>
+        </div>
+        <div class="controls">
+          <div>
+            <label for="timeline">Timeline</label>
+            <input id="timeline" type="range" min="0" max="240" value="0" step="1" />
+            <div class="meta">
+              <span>Frame <strong id="frameText">0</strong></span>
+              <span id="frameHint" class="hint"></span>
+            </div>
+          </div>
+          <div class="buttons">
+            <button id="prevFrameBtn">← Prev frame</button>
+            <button id="nextFrameBtn">Next frame →</button>
+            <button id="markDeathBtn" class="danger">Mark death here (D)</button>
+            <button id="markHealthyBtn" class="ok">Healthy whole time (H)</button>
+            <button id="prevRoiBtn">← Prev ROI</button>
+            <button id="nextRoiBtn" class="primary">Next ROI →</button>
+          </div>
+          <div id="status" class="status">Loading…</div>
+          <p class="hint">
+            Scroll the timeline or use arrow keys. Press <strong>D</strong> to mark death at the
+            current frame, <strong>H</strong> for healthy through the experiment (extra sentinel
+            frame), <strong>N</strong>/<strong>P</strong> for next/previous ROI.
+          </p>
+        </div>
+      </section>
+      <aside class="sidebar">
+        <strong>ROIs</strong>
+        <div class="hint">Click to jump. Green = labeled.</div>
+        <div id="roiList" class="roi-list"></div>
+      </aside>
+    </main>
+    <script>
+      const state = {
+        rois: [],
+        index: 0,
+        timeIndex: 0,
+        healthySentinel: 241,
+      };
+
+      const els = {
+        sessionSummary: document.getElementById("sessionSummary"),
+        progressText: document.getElementById("progressText"),
+        roiMeta: document.getElementById("roiMeta"),
+        bfImage: document.getElementById("bfImage"),
+        totoImage: document.getElementById("totoImage"),
+        timeline: document.getElementById("timeline"),
+        frameText: document.getElementById("frameText"),
+        frameHint: document.getElementById("frameHint"),
+        status: document.getElementById("status"),
+        roiList: document.getElementById("roiList"),
+      };
+
+      async function fetchJson(url, options) {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          const detail = await response.text();
+          throw new Error(detail || response.statusText);
+        }
+        return response.json();
+      }
+
+      function currentRoi() {
+        return state.rois[state.index];
+      }
+
+      function frameUrl(channel) {
+        const roi = currentRoi();
+        return `/api/rois/${roi.position}/${roi.roi_id}/frame/${state.timeIndex}?channel=${channel}`;
+      }
+
+      async function refreshImages() {
+        if (state.timeIndex >= state.healthySentinel) {
+          return;
+        }
+        const stamp = Date.now();
+        els.bfImage.src = `${frameUrl("brightfield")}&_=${stamp}`;
+        els.totoImage.src = `${frameUrl("toto")}&_=${stamp}`;
+      }
+
+      function updateTimelineUi() {
+        const roi = currentRoi();
+        const sentinel = roi.healthy_sentinel;
+        const atSentinel = state.timeIndex === sentinel;
+        els.timeline.max = String(sentinel);
+        els.timeline.value = String(state.timeIndex);
+        els.frameText.textContent = atSentinel
+          ? `${sentinel} (healthy sentinel)`
+          : String(state.timeIndex);
+        els.frameHint.textContent = atSentinel
+          ? "Use this frame if the cell never dies during the acquisition."
+          : `of 0–${sentinel - 1} imaged timepoints`;
+      }
+
+      function updateStatus() {
+        const roi = currentRoi();
+        els.status.className = "status";
+        if (!roi.labeled) {
+          els.status.textContent = "Not labeled yet.";
+          return;
+        }
+        if (roi.is_healthy) {
+          els.status.className = "status labeled-healthy";
+          els.status.textContent = `Labeled healthy (sentinel frame ${roi.death_frame}).`;
+          return;
+        }
+        els.status.className = "status labeled-death";
+        els.status.textContent = `Labeled death starting at frame ${roi.death_frame}.`;
+      }
+
+      function renderRoiMeta() {
+        const roi = currentRoi();
+        els.roiMeta.innerHTML = `
+          <span>ROI <strong>${roi.key}</strong></span>
+          <span>Condition <strong>${roi.position}</strong></span>
+          <span>Timepoints <strong>${roi.timepoints}</strong></span>
+          <span>Index <strong>${state.index + 1} / ${state.rois.length}</strong></span>
+        `;
+      }
+
+      function renderRoiList() {
+        els.roiList.innerHTML = "";
+        state.rois.forEach((roi, idx) => {
+          const item = document.createElement("div");
+          item.className = "roi-item";
+          if (idx === state.index) item.classList.add("active");
+          if (roi.labeled) item.classList.add("done");
+          const suffix = roi.labeled
+            ? roi.is_healthy
+              ? "healthy"
+              : `death@${roi.death_frame}`
+            : "pending";
+          item.textContent = `${roi.key} — ${suffix}`;
+          item.addEventListener("click", () => selectRoi(idx));
+          els.roiList.appendChild(item);
+        });
+      }
+
+      async function loadRoiDetail() {
+        const roi = currentRoi();
+        const detail = await fetchJson(`/api/rois/${roi.position}/${roi.roi_id}`);
+        state.healthySentinel = detail.healthy_sentinel;
+        if (detail.label) {
+          roi.labeled = true;
+          roi.death_frame = detail.label.death_frame;
+          roi.is_healthy = detail.label.is_healthy;
+          state.timeIndex = detail.label.is_healthy
+            ? detail.healthy_sentinel
+            : Math.min(detail.label.death_frame, detail.healthy_sentinel - 1);
+        } else {
+          state.timeIndex = 0;
+        }
+        renderRoiMeta();
+        updateTimelineUi();
+        updateStatus();
+        renderRoiList();
+        await refreshImages();
+      }
+
+      async function selectRoi(index) {
+        state.index = Math.max(0, Math.min(index, state.rois.length - 1));
+        await loadRoiDetail();
+      }
+
+      async function saveLabel(deathFrame) {
+        const roi = currentRoi();
+        const saved = await fetchJson("/api/labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            position: roi.position,
+            roi_id: roi.roi_id,
+            death_frame: deathFrame,
+          }),
+        });
+        roi.labeled = true;
+        roi.death_frame = saved.death_frame;
+        roi.is_healthy = saved.is_healthy;
+        state.timeIndex = saved.is_healthy ? state.healthySentinel : saved.death_frame;
+        updateTimelineUi();
+        updateStatus();
+        renderRoiList();
+        await refreshSession();
+      }
+
+      async function refreshSession() {
+        const session = await fetchJson("/api/session");
+        els.sessionSummary.textContent = ` · ${session.data_dir}`;
+        els.progressText.textContent = `${session.labeled_rois} / ${session.total_rois} labeled`;
+      }
+
+      async function init() {
+        state.rois = await fetchJson("/api/rois");
+        const firstUnlabeled = state.rois.findIndex((roi) => !roi.labeled);
+        state.index = firstUnlabeled === -1 ? 0 : firstUnlabeled;
+        await refreshSession();
+        renderRoiList();
+        await loadRoiDetail();
+      }
+
+      document.getElementById("timeline").addEventListener("input", async (event) => {
+        state.timeIndex = Number(event.target.value);
+        updateTimelineUi();
+        await refreshImages();
+      });
+      document.getElementById("prevFrameBtn").addEventListener("click", async () => {
+        state.timeIndex = Math.max(0, state.timeIndex - 1);
+        updateTimelineUi();
+        await refreshImages();
+      });
+      document.getElementById("nextFrameBtn").addEventListener("click", async () => {
+        state.timeIndex = Math.min(state.healthySentinel, state.timeIndex + 1);
+        updateTimelineUi();
+        await refreshImages();
+      });
+      document.getElementById("markDeathBtn").addEventListener("click", async () => {
+        if (state.timeIndex >= state.healthySentinel) return;
+        await saveLabel(state.timeIndex);
+      });
+      document.getElementById("markHealthyBtn").addEventListener("click", async () => {
+        await saveLabel(state.healthySentinel);
+      });
+      document.getElementById("prevRoiBtn").addEventListener("click", async () => {
+        await selectRoi(state.index - 1);
+      });
+      document.getElementById("nextRoiBtn").addEventListener("click", async () => {
+        await selectRoi(state.index + 1);
+      });
+
+      window.addEventListener("keydown", async (event) => {
+        if (event.target instanceof HTMLInputElement) return;
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          state.timeIndex = Math.max(0, state.timeIndex - 1);
+          updateTimelineUi();
+          await refreshImages();
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          state.timeIndex = Math.min(state.healthySentinel, state.timeIndex + 1);
+          updateTimelineUi();
+          await refreshImages();
+        }
+        if (event.key === "d" || event.key === "D") {
+          event.preventDefault();
+          if (state.timeIndex < state.healthySentinel) await saveLabel(state.timeIndex);
+        }
+        if (event.key === "h" || event.key === "H") {
+          event.preventDefault();
+          await saveLabel(state.healthySentinel);
+        }
+        if (event.key === "n" || event.key === "N") {
+          event.preventDefault();
+          await selectRoi(state.index + 1);
+        }
+        if (event.key === "p" || event.key === "P") {
+          event.preventDefault();
+          await selectRoi(state.index - 1);
+        }
+      });
+
+      init().catch((error) => {
+        els.status.textContent = `Failed to load: ${error.message}`;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "apoptosis"
+version = "0.1.0"
+description = "Apoptosis CLI"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.138.0",
+    "numpy>=2.2.6",
+    "pillow>=12.2.0",
+    "pydantic>=2.13.4",
+    "tifffile>=2025.5.10",
+    "typer>=0.15",
+    "uvicorn>=0.49.0",
+]
+
+[project.scripts]
+apoptosis = "apoptosis.main:run"
+
+[dependency-groups]
+dev = ["ruff>=0.9", "ty>=0.0.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apoptosis"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/apoptosis/static" = "apoptosis/static"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.ruff.lint.per-file-ignores]
+"src/apoptosis/commands/*.py" = ["B008"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.rules]
+all = "error"
+
+[tool.uv]
+exclude-newer = "7 days"
