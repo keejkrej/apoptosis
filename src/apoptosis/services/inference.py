@@ -23,7 +23,7 @@ from apoptosis.ml.viability_module import ViabilityModule
 POSITION_META = {
     "Pos0": {"label": "100 nM STS", "color": "#1f77b4"},
     "Pos28": {"label": "500 nM STS", "color": "#d62728"},
-    "Pos70": {"label": "ctr (toto-3 only)", "color": "#2ca02c"},
+    "Pos70": {"label": "Control", "color": "#2ca02c"},
 }
 
 
@@ -34,6 +34,7 @@ class CellInference:
     timepoints: int
     death_time_toto: int
     death_time_viability: int
+    toto_raw: list[float]
     toto_alive: list[float]
     death_probability: list[float]
 
@@ -105,7 +106,8 @@ def infer_all_cells(
         trace = toto_trace(data_dir, roi)
         # Use position-median residual for jump detection: suppresses common artifacts
         # (e.g. global illumination/focus shifts) while highlighting cell-specific
-        # intensity increases (dye uptake on death). Pos70 control should mostly stay alive.
+        # intensity increases (dye uptake on death). This applies to all positions,
+        # including controls (Pos70 cells can still die).
         pos_median = medians.get(roi.position)
         contrast = (trace - pos_median) if pos_median is not None else trace
         death_prob = _predict_death_probability(
@@ -120,10 +122,11 @@ def infer_all_cells(
                 position=roi.position,
                 roi_id=roi.roi_id,
                 timepoints=timepoints,
-                death_time_toto=death_time_from_toto(contrast, timepoints),
+                death_time_toto=death_time_from_toto(contrast, timepoints, raw_trace=trace),
                 death_time_viability=death_time_from_probability(
                     death_prob, timepoints
                 ),
+                toto_raw=trace.tolist(),
                 toto_alive=toto_alive_signal(trace).tolist(),
                 death_probability=death_prob.tolist(),
             )
