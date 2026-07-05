@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+"""Regenerate Figure 6 for the LISCA paper.
+
+Standalone script: reads viability inference JSON and produces a three-panel
+figure (single-cell time course + two scatter panels). Not exposed as a CLI
+command.
+
+Run with:
+    uv run python scripts/plot_fig6.py
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
