@@ -14,7 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 from matplotlib.lines import Line2D
+from matplotlib.patches import Ellipse
 import numpy as np
 
 from apoptosis.services.inference import POSITION_META, CellInference, load_inference
@@ -41,7 +43,11 @@ def _style_axes(ax: plt.Axes, *, xlabel: str | None = None, ylabel: str | None =
 
 
 def _panel_a_legend_handles() -> list[Line2D]:
-    """Legend handles for the single-sample panel A using distinct colors."""
+    """Legend handles for the single-sample panel A using distinct colors.
+
+    Death times are called out directly on the curves via arrow annotations
+    (see `plot_fig6`), so the legend only needs to identify the two signals.
+    """
     return [
         Line2D(
             [0],
@@ -56,22 +62,6 @@ def _panel_a_legend_handles() -> list[Line2D]:
             color=COLOR_TOTO,
             linewidth=1.8,
             label="Toto-3",
-        ),
-        Line2D(
-            [0],
-            [0],
-            color=COLOR_DEATH_MORPH,
-            linewidth=3.5,
-            alpha=0.8,
-            label=r"$T_D$ morphology",
-        ),
-        Line2D(
-            [0],
-            [0],
-            color=COLOR_DEATH_TOTO,
-            linewidth=3.5,
-            alpha=0.8,
-            label=r"$T_D$ Toto-3",
         ),
     ]
 
@@ -118,12 +108,39 @@ def plot_fig6(
     )
     _style_axes(ax_a2, ylabel="Toto-3")
 
+    # Transition times: annotate directly on each curve with an arrow rather
+    # than a full-height vertical line, so the two signals stay visually
+    # distinct and the panel reads less cluttered.
     death_h = example.death_time_viability * TIME_INTERVAL_MIN / 60
     if example.death_time_viability < example.timepoints:
-        ax_a.axvline(death_h, color=COLOR_DEATH_MORPH, alpha=0.8, linewidth=3.5)
+        prob_at_death = float(np.interp(death_h, time_axis, example.death_probability))
+        ax_a.annotate(
+            r"$T_D$ morphology",
+            xy=(death_h, prob_at_death),
+            xycoords="data",
+            xytext=(0.55, 0.85),
+            textcoords="axes fraction",
+            ha="left",
+            va="center",
+            fontsize=LEGEND_FONTSIZE_A,
+            color=COLOR_DEATH_MORPH,
+            arrowprops={"arrowstyle": "->", "color": COLOR_DEATH_MORPH, "lw": 1.5},
+        )
     toto_h = example.death_time_toto * TIME_INTERVAL_MIN / 60
     if example.death_time_toto < example.timepoints:
-        ax_a.axvline(toto_h, color=COLOR_DEATH_TOTO, alpha=0.8, linewidth=3.5)
+        toto_at_death = float(np.interp(toto_h, time_axis, example.toto_raw))
+        ax_a2.annotate(
+            r"$T_D$ Toto-3",
+            xy=(toto_h, toto_at_death),
+            xycoords="data",
+            xytext=(0.62, 0.18),
+            textcoords="axes fraction",
+            ha="left",
+            va="center",
+            fontsize=LEGEND_FONTSIZE_A,
+            color=COLOR_DEATH_TOTO,
+            arrowprops={"arrowstyle": "->", "color": COLOR_DEATH_TOTO, "lw": 1.5},
+        )
 
     legend_handles = _panel_a_legend_handles()
     ax_a.legend(
@@ -179,6 +196,36 @@ def plot_fig6(
     plt.close(fig)
 
 
+def _confidence_ellipse(ax: plt.Axes, x: np.ndarray, y: np.ndarray, *, n_std: float = 2.0, **kwargs) -> None:
+    """Draw a covariance-based confidence ellipse around (x, y), tilted along their correlation.
+
+    Standard matplotlib recipe: build a unit circle scaled by sqrt(1 +/- pearson_r)
+    along the +-45deg diagonal, then scale/rotate/translate it by the data's
+    per-axis std and mean. The resulting tilt makes it easy to see whether the
+    point cloud sits above or below the y=x line.
+    """
+    if x.size < 2:
+        return
+    cov = np.cov(x, y)
+    if not np.all(np.isfinite(cov)) or cov[0, 0] <= 0 or cov[1, 1] <= 0:
+        return
+    pearson = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+    pearson = float(np.clip(pearson, -0.999, 0.999))
+    radius_x = np.sqrt(1 + pearson)
+    radius_y = np.sqrt(1 - pearson)
+    ellipse = Ellipse((0, 0), width=radius_x * 2, height=radius_y * 2, **kwargs)
+    scale_x = np.sqrt(cov[0, 0]) * n_std
+    scale_y = np.sqrt(cov[1, 1]) * n_std
+    transf = (
+        transforms.Affine2D()
+        .rotate_deg(45)
+        .scale(scale_x, scale_y)
+        .translate(float(np.mean(x)), float(np.mean(y)))
+    )
+    ellipse.set_transform(transf + ax.transData)
+    ax.add_patch(ellipse)
+
+
 def _scatter_panel(
     ax: plt.Axes,
     cells: list[CellInference],
@@ -199,6 +246,10 @@ def _scatter_panel(
             color=color,
             edgecolors="none",
             label=label,
+        )
+        _confidence_ellipse(
+            ax, x, y, n_std=2.0,
+            facecolor="none", edgecolor="black", linestyle="--", linewidth=1.5, zorder=3,
         )
     lim = 200 * TIME_INTERVAL_MIN / 60 + 0.5
     ax.plot([0, lim], [0, lim], color="black", linewidth=1.0, zorder=0)
