@@ -248,7 +248,7 @@ def _scatter_panel(
             label=label,
         )
         _confidence_ellipse(
-            ax, x, y, n_std=2.0,
+            ax, x, y, n_std=1.0,
             facecolor="none", edgecolor="black", linestyle="--", linewidth=1.5, zorder=3,
         )
     lim = 200 * TIME_INTERVAL_MIN / 60 + 0.5
