@@ -19,6 +19,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse
 import numpy as np
 
+from apoptosis.core.toto import BASELINE_FRAMES
 from apoptosis.services.inference import POSITION_META, CellInference, load_inference
 
 TIME_INTERVAL_MIN = 10  # minutes per timepoint
@@ -40,13 +41,55 @@ def _style_axes(ax: plt.Axes, *, xlabel: str | None = None, ylabel: str | None =
     if ylabel is not None:
         ax.set_ylabel(ylabel, fontsize=AXIS_LABEL_FONTSIZE)
     ax.tick_params(axis="both", labelsize=TICK_LABEL_FONTSIZE)
+    for side in ("top", "right", "bottom", "left"):
+        ax.spines[side].set_visible(True)
+        ax.spines[side].set_color("black")
+
+
+def _toto_transition_interval(
+    toto_raw: np.ndarray,
+    death_toto: int,
+    timepoints: int,
+    *,
+    pre_frames: int = 15,
+    post_window: int = 12,
+) -> tuple[int, int] | None:
+    """Frame range where Toto-3 rises from pre-death baseline to post-transition level."""
+    if death_toto >= timepoints:
+        return None
+    trace = np.asarray(toto_raw, dtype=np.float64)
+    pre_start = max(BASELINE_FRAMES, death_toto - pre_frames)
+    if pre_start >= death_toto:
+        pre_start = max(0, death_toto - 5)
+    baseline = float(np.median(trace[pre_start:death_toto]))
+    window_end = min(len(trace), death_toto + post_window)
+    local_peak = float(np.max(trace[death_toto:window_end]))
+    if local_peak <= baseline + 1.0:
+        return None
+    low_thresh = baseline + 0.15 * (local_peak - baseline)
+    high_thresh = baseline + 0.85 * (local_peak - baseline)
+    start = death_toto
+    for frame in range(death_toto - 1, pre_start - 1, -1):
+        if trace[frame] < low_thresh:
+            start = frame + 1
+            break
+    end = death_toto
+    for frame in range(death_toto, window_end):
+        if trace[frame] >= high_thresh:
+            end = frame
+            break
+    else:
+        end = min(death_toto + 4, len(trace) - 1)
+    if end < start:
+        end = start
+    return start, end
 
 
 def _panel_a_legend_handles() -> list[Line2D]:
     """Legend handles for the single-sample panel A using distinct colors.
 
-    Death times are called out directly on the curves via arrow annotations
-    (see `plot_fig6`), so the legend only needs to identify the two signals.
+    Morphology and Toto-3 death markers are drawn on the panel but omitted
+    from the legend to keep it readable.
     """
     return [
         Line2D(
@@ -100,6 +143,10 @@ def plot_fig6(
     ax_a.set_ylim(-0.05, 1.05)
 
     ax_a2 = ax_a.twinx()
+    for side in ("top", "right", "bottom", "left"):
+        ax_a2.spines[side].set_visible(True)
+        ax_a2.spines[side].set_color("black")
+    ax_a2.tick_params(axis="y", labelsize=TICK_LABEL_FONTSIZE)
     ax_a2.plot(
         time_axis,
         example.toto_raw,
@@ -108,38 +155,59 @@ def plot_fig6(
     )
     _style_axes(ax_a2, ylabel="Toto-3")
 
-    # Transition times: annotate directly on each curve with an arrow rather
-    # than a full-height vertical line, so the two signals stay visually
-    # distinct and the panel reads less cluttered.
+    # Death markers span the full panel height but stay out of the legend.
+    panel_x = transforms.blended_transform_factory(ax_a.transData, ax_a.transAxes)
     death_h = example.death_time_viability * TIME_INTERVAL_MIN / 60
     if example.death_time_viability < example.timepoints:
-        prob_at_death = float(np.interp(death_h, time_axis, example.death_probability))
-        ax_a.annotate(
+        ax_a.vlines(
+            death_h,
+            0,
+            1,
+            transform=panel_x,
+            colors=COLOR_DEATH_MORPH,
+            linewidth=1.5,
+            zorder=2,
+            clip_on=False,
+        )
+        ax_a.text(
+            death_h,
+            1.02,
             r"$T_D$ morphology",
-            xy=(death_h, prob_at_death),
-            xycoords="data",
-            xytext=(0.55, 0.85),
-            textcoords="axes fraction",
-            ha="left",
-            va="center",
+            transform=panel_x,
+            ha="center",
+            va="bottom",
             fontsize=LEGEND_FONTSIZE_A,
             color=COLOR_DEATH_MORPH,
-            arrowprops={"arrowstyle": "->", "color": COLOR_DEATH_MORPH, "lw": 1.5},
+            clip_on=False,
         )
-    toto_h = example.death_time_toto * TIME_INTERVAL_MIN / 60
-    if example.death_time_toto < example.timepoints:
-        toto_at_death = float(np.interp(toto_h, time_axis, example.toto_raw))
-        ax_a2.annotate(
+    toto_interval = _toto_transition_interval(
+        example.toto_raw,
+        example.death_time_toto,
+        example.timepoints,
+    )
+    if toto_interval is not None:
+        start_h, end_h = (frame * TIME_INTERVAL_MIN / 60 for frame in toto_interval)
+        ax_a.axvspan(
+            start_h,
+            end_h,
+            ymin=0,
+            ymax=1,
+            transform=panel_x,
+            color=COLOR_DEATH_TOTO,
+            alpha=0.25,
+            zorder=0,
+            clip_on=False,
+        )
+        ax_a.text(
+            0.5 * (start_h + end_h),
+            -0.06,
             r"$T_D$ Toto-3",
-            xy=(toto_h, toto_at_death),
-            xycoords="data",
-            xytext=(0.62, 0.18),
-            textcoords="axes fraction",
-            ha="left",
-            va="center",
+            transform=panel_x,
+            ha="center",
+            va="top",
             fontsize=LEGEND_FONTSIZE_A,
             color=COLOR_DEATH_TOTO,
-            arrowprops={"arrowstyle": "->", "color": COLOR_DEATH_TOTO, "lw": 1.5},
+            clip_on=False,
         )
 
     legend_handles = _panel_a_legend_handles()
