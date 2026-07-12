@@ -171,14 +171,13 @@ def plot_fig6(
         )
         ax_a.text(
             death_h,
-            1.02,
+            0.96,
             r"$T_D$ morphology",
             transform=panel_x,
             ha="center",
-            va="bottom",
+            va="top",
             fontsize=LEGEND_FONTSIZE_A,
             color=COLOR_DEATH_MORPH,
-            clip_on=False,
         )
     toto_interval = _toto_transition_interval(
         example.toto_raw,
@@ -200,14 +199,13 @@ def plot_fig6(
         )
         ax_a.text(
             0.5 * (start_h + end_h),
-            -0.06,
+            0.06,
             r"$T_D$ Toto-3",
             transform=panel_x,
             ha="center",
-            va="top",
+            va="bottom",
             fontsize=LEGEND_FONTSIZE_A,
             color=COLOR_DEATH_TOTO,
-            clip_on=False,
         )
 
     legend_handles = _panel_a_legend_handles()
@@ -337,10 +335,8 @@ def main() -> None:
     results = load_inference(inference_path)
 
     out_dir = Path("/home/jack/workspace/lisca-paper/figs")
-    png_path = out_dir / "fig6.png"
     svg_path = out_dir / "fig6.svg"
 
-    plot_fig6(results, png_path)
     plot_fig6(results, svg_path)
 
     pos0_total = sum(1 for c in results if c.position == "Pos0")
@@ -353,7 +349,6 @@ def main() -> None:
     )
     print(f"Pos0 total: {pos0_total}, scatter cells: {pos0_scatter}")
     print(f"Pos28 total: {pos28_total}, scatter cells: {pos28_scatter}")
-    print(f"PNG: {png_path} ({png_path.stat().st_size} bytes)")
     print(f"SVG: {svg_path} ({svg_path.stat().st_size} bytes)")
 
 
