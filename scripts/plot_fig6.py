@@ -331,7 +331,7 @@ def _scatter_panel(
 
 
 def main() -> None:
-    inference_path = Path("/home/jack/workspace/apoptosis/runs/viability/inference.json")
+    inference_path = Path("/home/jack/workspace/lisca-killing-assay/runs/viability/inference.json")
     results = load_inference(inference_path)
 
     out_dir = Path("/home/jack/workspace/lisca-paper/figs")
